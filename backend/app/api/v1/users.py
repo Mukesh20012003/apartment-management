@@ -3,9 +3,10 @@ from datetime import timedelta
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, status, HTTPException
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 
-from app.api.dependencies import get_current_user
+from app.api.dependencies import get_current_user, require_role
 from app.database.session import get_db
 from app.services.user_service import UserService
 from app.repositories.user_repository import UserRepository
@@ -21,10 +22,7 @@ from app.core.exceptions import InvalidCredentials
 from app.models.user import User
 from app.config import settings
 
-router = APIRouter(
-    prefix="/users",
-    tags=["users"],
-)
+router = APIRouter(prefix="/api/v1/users", tags=["users"])
 
 
 def get_user_service(db: Session) -> UserService:
@@ -61,18 +59,16 @@ async def register_user(
 
 @router.post("/login", response_model=TokenResponse)
 async def login(
-    credentials: UserLogin,
+    form_data: Annotated[OAuth2PasswordRequestForm, Depends()],
     db: Annotated[Session, Depends(get_db)],
 ):
-    """
-    Login user and return access token.
-    """
     service = get_user_service(db)
 
     try:
+        # OAuth2 form uses "username" field; you treat it as email
         user = service.authenticate_user(
-            credentials.email,
-            credentials.password,
+            form_data.username,
+            form_data.password,
         )
     except InvalidCredentials:
         raise HTTPException(
