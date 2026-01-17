@@ -21,22 +21,25 @@ class FlatResponse(FlatBase):
         from_attributes = True
 
 class ResidentBase(BaseModel):
+    user_id: UUID
     flat_id: UUID
-    move_in_date: Optional[str] = None
-    family_members: int = 1
+    status: ResidentStatus = ResidentStatus.APPROVED
+    move_in_date: Optional[datetime] = None
+    id_proof_url: Optional[str] = None
+    ownership_proof_url: Optional[str] = None
+    family_members: int = 1 
     vehicle_details: Optional[str] = None
     emergency_contact: Optional[str] = None
+    approval_notes: Optional[str] = None
+
+class ResidentCreate(ResidentBase):
+    pass
 
 class ResidentRegister(ResidentBase):
     user_id: UUID
 
 class ResidentResponse(ResidentBase):
     id: UUID
-    user_id: UUID
-    status: ResidentStatus
-    id_proof_url: Optional[str]
-    ownership_proof_url: Optional[str]
-    approval_notes: Optional[str]
     created_at: datetime
     updated_at: datetime
 

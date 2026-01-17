@@ -25,11 +25,23 @@ router = APIRouter(
     tags=["tickets"],
 )
 
-
 def get_ticket_service(db: Session) -> TicketService:
     """Helper to build TicketService from DB session."""
     repository = TicketRepository(db)
     return TicketService(repository, db)
+
+# Reusable dependencies
+CurrentUser = Annotated[User, Depends(get_current_user)]
+
+StaffOrAdmin = Annotated[
+    User,
+    Depends(
+        require_role(
+            UserRole.ASSOCIATION_STAFF,
+            UserRole.ADMIN,
+        )
+    ),
+]
 
 
 @router.post(
@@ -40,7 +52,7 @@ def get_ticket_service(db: Session) -> TicketService:
 @invalidate_cache(CacheKeys.open_tickets())
 async def create_ticket(
     ticket_data: TicketCreate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: CurrentUser,
     db: Annotated[Session, Depends(get_db)],
 ):
     """
@@ -81,10 +93,11 @@ async def create_ticket(
     "/{ticket_id}",
     response_model=TicketResponse,
 )
-@cached(CacheKeys.ticket_by_id, ttl=1800)
+@invalidate_cache(CacheKeys.open_tickets())
+@cached(lambda ticket_id, *args, **kwargs: CacheKeys.ticket_by_id(ticket_id), ttl=1800)
 async def get_ticket(
     ticket_id: UUID,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: CurrentUser,
     db: Annotated[Session, Depends(get_db)],
 ):
     """
@@ -110,15 +123,7 @@ async def get_ticket(
 async def assign_ticket(
     ticket_id: UUID,
     assign_data: TicketAssign,
-    current_user: Annotated[
-        User,
-        Depends(
-            require_role(
-                UserRole.ASSOCIATION_STAFF,
-                UserRole.ADMIN,
-            )
-        ),
-    ],
+    current_user: StaffOrAdmin,
     db: Annotated[Session, Depends(get_db)],
 ):
     """
@@ -149,7 +154,7 @@ async def assign_ticket(
 async def update_ticket(
     ticket_id: UUID,
     ticket_update: TicketUpdate,
-    current_user: Annotated[User, Depends(get_current_user)],
+    current_user: CurrentUser,
     db: Annotated[Session, Depends(get_db)],
 ):
     """

@@ -33,10 +33,5 @@ class BaseModel(Base):
         return {c.name: getattr(self, c.name) for c in self.__table__.columns}
 
 
-# Import models so Alembic sees them
-from app.models.user import User  # noqa
-from app.models.resident import Flat, Resident  # noqa
-from app.models.ticket import Ticket  # noqa
-from app.models.visitor import VisitorLog  # noqa
-from app.models.payment import MonthlyFee, Payment  # noqa
-from app.models.notice import Notice  # noqa
+# Do NOT import models here (avoids circular imports).
+# Alembic can import models in alembic/env.py when ne
