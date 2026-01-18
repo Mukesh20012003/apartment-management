@@ -1,8 +1,10 @@
 from typing import List
 from uuid import UUID
 
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+
 
 from app.database.session import get_db
 from app.repositories.notice_repository import NoticeRepository
@@ -13,11 +15,14 @@ from app.schemas.notice import (  # you create these Pydantic models
     NoticeResponse,
 )
 
+
 from app.schemas.user import UserResponse, UserRole
 from app.api.dependencies import get_current_user, require_role
-from app.core.constants import NoticeStatus
+from app.core.constants import NoticeStatus, UserRole
+
 
 router = APIRouter(prefix="/notices", tags=["notices"])
+
 
 
 def get_notice_service(db: Session = Depends(get_db)) -> NoticeService:
@@ -25,8 +30,10 @@ def get_notice_service(db: Session = Depends(get_db)) -> NoticeService:
     return NoticeService(repo)
 
 
+
 # Admin/association users manage notices
 admin_roles = (UserRole.ADMIN, UserRole.ASSOCIATION_STAFF)
+
 
 
 @router.post(
@@ -53,6 +60,7 @@ def create_notice(
     return notice
 
 
+
 @router.post(
     "/{notice_id}/publish",
     response_model=NoticeResponse,
@@ -73,6 +81,7 @@ def publish_notice(
             detail="Notice not found",
         )
     return notice
+
 
 
 @router.patch(
@@ -97,6 +106,7 @@ def update_notice(
     return notice
 
 
+
 @router.delete(
     "/{notice_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -115,7 +125,9 @@ def delete_notice(
     return
 
 
+
 # Public/resident endpoints
+
 
 
 @router.get(
@@ -127,6 +139,7 @@ def list_active_notices(
 ):
     """All logged-in users can see active notices (or keep fully public if your auth allows)."""
     return service.list_active_notices()
+
 
 
 @router.get(

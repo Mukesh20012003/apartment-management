@@ -83,3 +83,8 @@ class PaymentRepository:
         self.db.commit()
         self.db.refresh(payment)
         return payment
+    
+    # Add these methods to PaymentRepository class:
+    def get_by_transaction_id(self, transaction_id: str) -> Optional[Payment]:
+        return self.db.query(Payment).filter(Payment.transaction_id == transaction_id).first()
+

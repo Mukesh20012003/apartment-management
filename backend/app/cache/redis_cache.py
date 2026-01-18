@@ -4,7 +4,7 @@ import logging
 from typing import Optional, Any
 
 from pydantic import BaseModel
-import redis
+import redis # pyright: ignore[reportMissingImports]
 
 from app.config import settings
 

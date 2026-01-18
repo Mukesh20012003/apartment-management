@@ -1,83 +1,83 @@
 from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
+import logging
 
+from sqlalchemy.orm import Session
+from app.services.base_service import BaseService  # assuming you have this
 from app.repositories.notice_repository import NoticeRepository
-from app.models.notice import Notice
 from app.core.constants import NoticeStatus
+from app.core.exceptions import AppException  # create if missing
+from app.events.events import NoticePublishedEvent  # create if missing
 
+logger = logging.getLogger(__name__)
 
-class NoticeService:
-    """Business logic for notice board"""
-
-    def __init__(self, repository: NoticeRepository):
+class NoticeService(BaseService):
+    """Production notice service with events"""
+    
+    def __init__(self, repository: NoticeRepository, db: Session):
+        super().__init__(repository, db)
         self.repository = repository
+        self.db = db
 
     def create_notice(
         self,
-        *,
         title: str,
         content: str,
-        category: str,
         published_by_id: UUID,
-        attachment_url: str | None = None,
-        status: NoticeStatus = NoticeStatus.DRAFT,
-        published_date: str | None = None,
-        expiry_date: str | None = None,
-    ) -> Notice:
-        data = {
+        category: str,
+        attachment_url: Optional[str] = None,
+        expiry_date: Optional[str] = None
+    ):
+        """Create notice (initially as draft)"""
+        notice_data = {
             "title": title,
             "content": content,
+            "published_by_id": published_by_id,
             "category": category,
-            "published_by_id": published_by_id,
             "attachment_url": attachment_url,
-            "status": status,
-            "published_date": published_date,
             "expiry_date": expiry_date,
+            "status": NoticeStatus.DRAFT
         }
-        return self.repository.create(data)
 
-    def publish_notice(
-        self,
-        notice_id: UUID,
-        published_by_id: UUID,
-        published_date: str | None = None,
-        expiry_date: str | None = None,
-    ) -> Optional[Notice]:
-        notice = self.repository.get(notice_id)
+        notice = self.repository.create(notice_data)
+        logger.info(f"Notice created as draft: {notice.id}")
+        return notice
+
+    def publish_notice(self, notice_id: UUID, event_publisher=None):
+        """Publish notice and emit event"""
+        notice = self.repository.read(notice_id)
         if not notice:
-            return None
+            raise AppException("Notice not found")
 
-        data = {
+        # Update status
+        updated = self.repository.update(notice_id, {
             "status": NoticeStatus.PUBLISHED,
-            "published_date": published_date or datetime.utcnow().isoformat(),
-            "expiry_date": expiry_date,
-            "published_by_id": published_by_id,
-        }
-        return self.repository.update(notice, data)
+            "published_date": datetime.utcnow().isoformat()
+        })
 
-    def update_notice(
-        self,
-        notice_id: UUID,
-        data: dict,
-    ) -> Optional[Notice]:
-        notice = self.repository.get(notice_id)
-        if not notice:
-            return None
-        return self.repository.update(notice, data)
+        # Emit event (for email/push notifications)
+        if event_publisher:
+            event = NoticePublishedEvent({
+                "notice_id": str(notice_id),
+                "title": notice.title,
+                "content": notice.content[:100] + "..."
+            })
+            event_publisher.publish(event)
+            
+        logger.info(f"Notice published: {notice_id}")
+        return updated
 
-    def delete_notice(self, notice_id: UUID) -> bool:
-        notice = self.repository.get(notice_id)
-        if not notice:
-            return False
-        self.repository.delete(notice)
-        return True
+    def archive_notice(self, notice_id: UUID):
+        """Archive notice (hide from residents)"""
+        return self.repository.update(notice_id, {
+            "status": NoticeStatus.ARCHIVED
+        })
 
-    def get_notice(self, notice_id: UUID) -> Optional[Notice]:
-        return self.repository.get(notice_id)
+    def list_active_notices(self, skip: int = 0, limit: int = 50) -> List:
+        """Get published/active notices with pagination"""
+        return self.repository.list_active(skip=skip, limit=limit)
 
-    def list_active_notices(self) -> List[Notice]:
-        return self.repository.list_active()
-
-    def list_all_notices(self) -> List[Notice]:
-        return self.repository.list_all()
+    def get_notice(self, notice_id: UUID):
+        """Get single notice"""
+        return self.repository.read(notice_id)
