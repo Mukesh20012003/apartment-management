@@ -1,5 +1,5 @@
 # backend/tests/test_auth.py
-import pytest
+import pytest # type: ignore
 from fastapi.testclient import TestClient
 
 from app.main import app
